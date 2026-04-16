@@ -1,0 +1,201 @@
+You are building a Python tool called an MCP (Model Context Protocol) server that enables safe, human-approved SSH command execution driven by an LLM (Codex).
+
+## High-level goal
+
+Create a TUI-based MCP server that:
+
+* Maintains a persistent SSH session to a remote machine
+* Receives structured command requests from an LLM
+* Presents each command to a human for approval
+* Optionally allows the human to edit or reject the command
+* Executes only approved commands
+* Returns structured results back to the LLM
+* Colorful and nice TUI user interface (prefer Textual)
+
+---
+
+## Core requirements
+
+### 1. Persistent SSH session
+
+* Use Python (prefer `paramiko`)
+* Connect once and reuse the session
+* Gets the user-name from the user and keeps is 
+* Gets the pwd from the user, uses it to login and forget the pwd
+
+* Support:
+
+  * command execution
+    The command might originate with the user or (normally) the AI agent
+  * maintaining working directory state
+  * capturing stdout, stderr, and exit code
+
+---
+
+### 2. Command protocol (LLM → MCP)
+
+The MCP server must accept JSON messages in this format:
+
+{
+"command": "string",
+"purpose": "string",
+"risk": "low | medium | high"
+}
+
+Validate all fields before processing.
+
+---
+
+### 3. Human approval loop
+
+For every command:
+
+Display clearly:
+
+---
+
+Command: <command>
+Purpose: <purpose>
+Risk: <risk>
+------------
+
+Prompt the user:
+
+Approve? (y/n/edit):
+
+Supported actions:
+
+* y → execute as-is
+* n → reject and ask user for feedback
+* The user may edit the command before execution
+
+---
+
+### 4. Rejection feedback (Human → LLM)
+
+If rejected, return:
+
+{
+"approved": false,
+"comment": "string"
+}
+
+---
+
+### 5. Execution result (MCP → LLM)
+
+If approved and executed, return:
+
+{
+"approved": true,
+"stdout": "...",
+"stderr": "...",
+"exit_code": 0
+}
+
+---
+
+### 6. Safety layer (critical)
+
+Implement safeguards:
+
+#### a. Block dangerous patterns unless explicitly confirmed
+
+Examples:
+
+* rm -rf
+* dd
+* mkfs
+* reboot / shutdown
+* modprobe -r
+
+If detected:
+
+* require a second confirmation step
+* clearly warn the user
+
+#### b. Prevent command chaining
+
+warn on:
+
+* &&
+* ;
+* |
+
+#### c. Limit command length
+
+Avoid prompt injection or abuse
+
+#### d. filter-out "non printable" or "strange unicode" commands
+
+To avoid commands that visually hide what they do
+
+#### e. Try to hide the username from the AI agent
+
+You get the username during the logon process.
+Replace the username with USER in the displayed and returned replies.
+
+---
+
+### 7. Logging
+
+Log all:
+
+* commands
+* approvals/rejections
+* outputs
+
+Never log passwords or other credentials
+
+Write to a local file:
+ssh_bridge_log.jsonl
+
+---
+
+### 8. CLI interface
+
+Example usage:
+
+python ssh_bridge.py --host 1.2.3.4 --user myusername
+
+The tool should:
+
+* establish SSH
+* enter a loop waiting for LLM messages (stdin or socket)
+
+---
+
+### 9. Code style
+
+* Try to include all code in a single file - for easy deployment
+* Generate README.md and AGENTS.md
+* Include comments in the format:
+#2. ddddd dddd  d ddd
+---
+
+### 10. Nice-to-have features
+
+* Timeout handling
+* Ctrl+C safe shutdown
+* Command history
+
+---
+
+## Constraints
+
+* Do NOT execute any command without explicit approval
+* Always assume the LLM can be wrong or unsafe
+* Keep the human in full control
+
+---
+
+## Deliverable
+
+Produce:
+
+* Full working Python code
+* Clear structure
+* Minimal dependencies
+* Instructions to run
+
+Focus on clarity and safety over cleverness.

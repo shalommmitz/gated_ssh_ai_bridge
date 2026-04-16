@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+while sudo iptables -D INPUT -i docker0 -p tcp --dport 8765 -j ACCEPT 2>/dev/null; do
+  :
+done
+
+while sudo iptables -D INPUT -i docker0 -j DROP 2>/dev/null; do
+  :
+done
+
+sudo iptables -I INPUT 1 -i docker0 -p tcp --dport 8765 -j ACCEPT
+sudo iptables -I INPUT 2 -i docker0 -j DROP
+
+python ssh_bridge.py --host 1.1.1.1 --bridge-host 172.17.0.1 --bridge-port 8765
