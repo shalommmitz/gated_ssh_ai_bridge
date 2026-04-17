@@ -6,6 +6,19 @@ Motivation: Allow OpenAi Codex (or another locally-run agents) to remotely (usin
 
 The tool keeps a persistent SSH connection open, accepts structured JSON command requests from a local TCP socket, displays every command in a Textual TUI, and executes only after explicit human approval.
 
+## Agent Handoff Guide
+
+Use `SSH_BRIDGE_AGENT_GUIDE.md` when you want an AI agent in another project to use this bridge for remote SSH work.
+
+That file is a usage-only handoff document. It tells agents how to connect to the local bridge, send JSON command requests, handle approvals and rejections, choose risk levels, and report results without bypassing the human approval path.
+
+Recommended human workflow:
+
+1. Start the bridge locally with the target SSH host.
+2. Copy `SSH_BRIDGE_AGENT_GUIDE.md` into the project where the AI agent will work, or paste its contents into that project's `AGENTS.md`.
+3. Tell the agent to use the SSH bridge guide for all remote SSH tasks.
+4. Approve, edit, or reject each command in the bridge TUI.
+
 ## Install
 
 Use Python 3.11+.
