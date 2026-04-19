@@ -7,6 +7,18 @@ The bridge is a human-gated SSH command service. You send one JSON request to a
 local TCP socket. A human sees the command in the bridge TUI and must approve,
 edit, or reject it before anything runs over SSH.
 
+## Permissions (related to everything you do, not only using this tool)
+
+You are authorized to do whatever you like (within reason) w/o asking
+  for permission. The rational is:
+  1. You are running in a dedicated Docker. So, you do not have any ability to
+  perform any damager (maybe waste resources if you really try).  Specifically,
+  you do not have access to any files that are not directly related to you
+  tasks and are easily re-created. Also, you do not have access to any
+  credentials (beside your activation token).
+  2. Every command you send to the remote system is manually reviewed by me, and
+  NOT executed before I explicitly allow it. And I do look.
+
 ## Non-Negotiable Rules
 
 - Use the SSH bridge for remote work. Do not bypass it with direct `ssh`, `scp`,
@@ -64,6 +76,61 @@ Expected response:
 If you are inside Docker, replace `127.0.0.1` with
 `host.docker.internal`.
 
+## Preferred Client: `bridge_request.py`
+
+If `bridge_request.py` is available in your project, use it as the normal way to
+send bridge requests.
+
+Usage:
+
+```bash
+python3 bridge_request.py COMMAND PURPOSE RISK
+```
+
+Example:
+
+```bash
+python3 bridge_request.py "pwd" "Show the current remote working directory before making changes." low
+```
+
+The helper:
+
+- Sends one JSON command request to the bridge.
+- Defaults to `host.docker.internal:8765`, which is intended for Docker-based
+  agents talking to a bridge running on the host.
+- Prints the raw JSON response from the bridge.
+- Waits up to 600 seconds for the human decision and command result by default.
+- Reads the full newline-terminated bridge response, including large stdout or
+  stderr payloads.
+
+Environment overrides:
+
+```bash
+SSH_BRIDGE_HOST=127.0.0.1 SSH_BRIDGE_PORT=8765 python3 bridge_request.py "pwd" "Show the current remote working directory." low
+```
+
+Supported variables:
+
+- `SSH_BRIDGE_HOST`: bridge host, default `host.docker.internal`.
+- `SSH_BRIDGE_PORT`: bridge port, default `8765`.
+- `SSH_BRIDGE_CONNECT_TIMEOUT`: connection timeout in seconds, default `5`.
+- `SSH_BRIDGE_WAIT_TIMEOUT`: response wait timeout in seconds, default `600`.
+  Use `0` or a negative value to wait indefinitely.
+
+The helper's wait timeout is not the remote command execution timeout. The
+remote execution timeout is enforced by the bridge process itself, using the
+bridge's `--timeout` option.
+
+If `COMMAND` starts with `@`, the helper reads the command from that file:
+
+```bash
+python3 bridge_request.py @remote-command.txt "Run the prepared one-line diagnostic command." medium
+```
+
+The file content is still sent as one command and must satisfy bridge validation.
+Do not use multiline heredocs or scripts unless the human explicitly provides a
+safe workflow for that task.
+
 ## Request Protocol
 
 Send exactly one JSON object per line.
@@ -80,17 +147,8 @@ Example request:
 {"command":"pwd","purpose":"Show the current remote working directory before making changes.","risk":"low"}
 ```
 
-Example sender:
-
-```bash
-python3 -c 'import json,socket; req={"command":"pwd","purpose":"Show the current remote working directory before making changes.","risk":"low"}; s=socket.create_connection(("127.0.0.1",8765),timeout=5); s.sendall((json.dumps(req)+"\n").encode()); print(s.recv(65535).decode(), end=""); s.close()'
-```
-
-Inside Docker:
-
-```bash
-python3 -c 'import json,socket; req={"command":"pwd","purpose":"Show the current remote working directory before making changes.","risk":"low"}; s=socket.create_connection(("host.docker.internal",8765),timeout=5); s.sendall((json.dumps(req)+"\n").encode()); print(s.recv(65535).decode(), end=""); s.close()'
-```
+Use `bridge_request.py` unless it is unavailable. The raw protocol exists as a
+fallback for environments where you cannot use the helper.
 
 ## Responses
 
@@ -179,12 +237,13 @@ purpose for each step.
 ## Practical Workflow
 
 1. Ping the bridge if you are not sure it is reachable.
-2. Establish context with safe read-only commands such as `pwd`, `hostname`,
+2. Use `bridge_request.py` for command requests when it is available.
+3. Establish context with safe read-only commands such as `pwd`, `hostname`,
    `whoami`, `ls`, and targeted status checks.
-3. Explain each next command in `purpose` using concrete intent, not generic text.
-4. Prefer small, reversible changes.
-5. Verify every change with a follow-up read-only command.
-6. Summarize only what was actually approved and observed.
+4. Explain each next command in `purpose` using concrete intent, not generic text.
+5. Prefer small, reversible changes.
+6. Verify every change with a follow-up read-only command.
+7. Summarize only what was actually approved and observed.
 
 ## File Editing On The Remote Host
 
@@ -255,22 +314,34 @@ Do not request secrets:
 
 Do not send multiline commands. They will be rejected.
 
-## Minimal Python Helper
+## Raw Socket Fallback
 
-Use this helper shape in your own local commands if you need to send multiple
-bridge requests from the agent environment. Keep the request content specific to
-the task.
+Use this fallback only when `bridge_request.py` is unavailable. Keep the request
+content specific to the task.
 
 ```python
 import json
 import socket
 
 
-def bridge_request(command, purpose, risk="low", host="127.0.0.1", port=8765):
+def read_line(sock):
+    chunks = []
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        if b"\n" in chunk:
+            break
+    return b"".join(chunks).decode()
+
+
+def bridge_request(command, purpose, risk="low", host="host.docker.internal", port=8765):
     request = {"command": command, "purpose": purpose, "risk": risk}
     with socket.create_connection((host, port), timeout=5) as sock:
+        sock.settimeout(600)
         sock.sendall((json.dumps(request) + "\n").encode())
-        return json.loads(sock.recv(65535).decode())
+        return json.loads(read_line(sock))
 
 
 result = bridge_request(
@@ -281,7 +352,8 @@ result = bridge_request(
 print(json.dumps(result, indent=2))
 ```
 
-If running inside Docker, call the helper with `host="host.docker.internal"`.
+If the bridge is local to the same network namespace, call the fallback helper
+with `host="127.0.0.1"`.
 
 ## Final Reporting
 

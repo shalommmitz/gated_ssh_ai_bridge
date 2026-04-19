@@ -12,4 +12,4 @@ done
 sudo iptables -I INPUT 1 -i docker0 -p tcp --dport 8765 -j ACCEPT
 sudo iptables -I INPUT 2 -i docker0 -j DROP
 
-python ssh_bridge.py --host 1.1.1.1 --bridge-host 172.17.0.1 --bridge-port 8765
+python ssh_bridge.py --host 1.1.1.1 --port 7777 --user myUserName --bridge-host 172.17.0.1 --bridge-port 8765
