@@ -19,7 +19,7 @@ import sys
 import threading
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -107,7 +107,7 @@ class HistoryEntry:
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def redact_username(value: Any, username: str) -> Any:
@@ -1258,6 +1258,9 @@ def run_self_tests() -> int:
         return 1
     if response_ping() != {"ok": True, "pong": True}:
         print("self-test failed: ping response", file=sys.stderr)
+        return 1
+    if datetime.fromisoformat(utc_now()).tzinfo is None:
+        print("self-test failed: UTC timestamp must include timezone", file=sys.stderr)
         return 1
 
     print("self-tests passed")

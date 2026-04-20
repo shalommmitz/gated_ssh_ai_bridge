@@ -48,6 +48,8 @@ the task intelligently.
 
 ## Quick Start
 
+Requires Python 3.10 or newer.
+
 Install the runtime dependencies:
 
 ```bash
