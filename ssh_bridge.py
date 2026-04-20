@@ -509,33 +509,39 @@ class BridgeApp(App):  # type: ignore[misc]
     }
 
     #decision_bar {
-        height: 3;
+        height: 1;
         padding: 0 1;
         background: #101418;
     }
 
     .decision_button {
-        width: 1fr;
-        margin: 0 1;
+        height: 1;
+        margin: 0 1 0 0;
+        padding: 0 1;
+        border: none;
         text-style: bold;
     }
 
     #approve_button {
+        width: 14;
         background: #20e070;
         color: #06130b;
     }
 
     #confirm_button {
+        width: 9;
         background: #ff2f6d;
         color: #ffffff;
     }
 
     #reject_button {
+        width: 12;
         background: #ffb000;
         color: #1b1200;
     }
 
     #edit_button {
+        width: 6;
         background: #55d7ff;
         color: #06141a;
     }
