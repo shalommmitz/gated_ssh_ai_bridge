@@ -229,7 +229,14 @@ Expect extra scrutiny for:
 - `mkfs`
 - `reboot`, `shutdown`, `poweroff`, or `halt`
 - `modprobe -r`
-- Unquoted command chaining operators such as `&&`, `;`, or `|`
+- Unquoted command chaining operators such as `&&`, `||`, or `;`
+- Pipes whose right-hand command is not a known text filter
+
+Simple text-filter pipelines such as `ls | grep pattern`,
+`ps aux | grep nginx | wc -l`, or `journalctl -n 200 | grep error` do not require
+the extra confirmation just because they contain `|`. Pipes into shells,
+interpreters, `sudo`, `xargs`, `tee`, package managers, or unknown commands still
+require extra scrutiny.
 
 Avoid command chaining when possible. Prefer separate requests with a clear
 purpose for each step.
