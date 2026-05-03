@@ -1,0 +1,23 @@
+ #!/usr/bin/env bash
+  set -euo pipefail
+
+  u="${1:-$USER}"
+  f="/etc/sudoers.d/90-bridge-temp-nopasswd"
+  tmp="$(mktemp)"
+
+  cleanup() {
+    rm -f "$tmp"
+  }
+  trap cleanup EXIT
+
+  printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$u" > "$tmp"
+  sudo chmod 0440 "$tmp"
+  sudo visudo -cf "$tmp"
+  sudo install -o root -g root -m 0440 "$tmp" "$f"
+
+  sudo systemd-run \
+    --unit=remove-bridge-temp-nopasswd \
+    --on-active=1h \
+    /usr/bin/rm -f "$f"
+
+  echo "Passwordless sudo enabled for '$u' for up to 1 hour."

@@ -1,1 +1,3 @@
 ssh_bridge_log.jsonl
+run_ssh_bridge_*
+setup_tunnel_to_*
